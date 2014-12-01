@@ -64,7 +64,8 @@ static int
 write_seafile (SeafFSManager *fs_mgr,
                const char *repo_id, int version,
                CDCFileDescriptor *cdc,
-               unsigned char *obj_sha1);
+               unsigned char *obj_sha1,
+               SeafMetadataType mtype);
 #endif  /* SEAFILE_SERVER */
 
 SeafFSManager *
@@ -341,17 +342,21 @@ create_seafile_v0 (CDCFileDescriptor *cdc, int *ondisk_size, char *seafile_id)
     return ondisk;
 }
 
+// takes a CDC which contains chucks and sha1 hashes of each chunk
+// creates a json string with filesize and chunk sha1 hashes in hex
 static void *
 create_seafile_json (int repo_version,
                      CDCFileDescriptor *cdc,
                      int *ondisk_size,
-                     char *seafile_id)
+                     char *seafile_id,
+                     SeafMetadataType mtype)
 {
     json_t *object, *block_id_array;
 
     object = json_object ();
 
-    json_object_set_int_member (object, "type", SEAF_METADATA_TYPE_FILE);
+    
+    json_object_set_int_member (object, "type", mtype);
     json_object_set_int_member (object, "version",
                                 seafile_version_from_repo_version(repo_version));
 
@@ -421,7 +426,9 @@ write_seafile (SeafFSManager *fs_mgr,
                const char *repo_id,
                int version,
                CDCFileDescriptor *cdc,
-               unsigned char *obj_sha1)
+               unsigned char *obj_sha1,
+               SeafMetadataType mtype
+               )
 {
     int ret = 0;
     char seafile_id[41];
@@ -429,7 +436,7 @@ write_seafile (SeafFSManager *fs_mgr,
     int ondisk_size;
 
     if (version > 0) {
-        ondisk = create_seafile_json (version, cdc, &ondisk_size, seafile_id);
+        ondisk = create_seafile_json (version, cdc, &ondisk_size, seafile_id, mtype);
 
         guint8 *compressed;
         int outlen;
@@ -587,18 +594,44 @@ seaf_fs_manager_index_blocks (SeafFSManager *mgr,
     SeafStat sb;
     CDCFileDescriptor cdc;
 
+    seaf_debug("seaf_fs_manager_index_blocks: %s\n", file_path);
+
     if (seaf_stat (file_path, &sb) < 0) {
         g_warning ("Bad file %s: %s.\n", file_path, strerror(errno));
         return -1;
     }
 
-    g_return_val_if_fail (S_ISREG(sb.st_mode), -1);
+    g_return_val_if_fail (S_ISREG(sb.st_mode)||S_ISLNK(sb.st_mode), -1);
 
     if (sb.st_size == 0) {
         /* handle empty file. */
+        seaf_debug("seaf_fs_manager_index_blocks: handling empty file %s\n", file_path);
         memset (sha1, 0, 20);
         create_cdc_for_empty_file (&cdc);
+    } else if (S_ISLNK(sb.st_mode)) {
+        /* handle a symlink without following it */
+        seaf_debug("seaf_fs_manager_index_blocks: handling symlink file %s\n", file_path);
+        memset(&cdc, 0, sizeof(cdc));
+        cdc.block_sz = calculate_chunk_size(sb.st_size); // 1 MiB
+        cdc.block_min_sz = cdc.block_sz >> 2;
+        cdc.block_max_sz = cdc.block_sz << 2;
+        cdc.write_block = seafile_write_chunk;
+        memcpy(cdc.repo_id, repo_id, 36);
+        cdc.version = version;
+        // DALETODO: sha1 the contents of the symlink into cdc.blk_sha1s, and write each block to seafile chunk cache
+        if ( symlink_chunk_cdc(file_path, &cdc, crypt, write_data) < 0 ) {
+            g_warning("Failed to chunk symlink with CDC.\n");
+            return -1;
+        }
+
+        // create json with sha1 hashes and write to cache filesytstem
+        //memset (sha1, 0, 20);
+        if ( write_data && write_seafile(mgr, repo_id, version, &cdc, sha1, SEAF_METADATA_TYPE_LINK) < 0 ) {
+            g_warning ("Failed to write seafile for %s.\n", file_path);
+            return -1;
+        }
     } else {
+        seaf_debug("seaf_fs_manager_index_blocks: handling normal file %s\n", file_path);
         memset (&cdc, 0, sizeof(cdc));
         cdc.block_sz = calculate_chunk_size (sb.st_size);
         cdc.block_min_sz = cdc.block_sz >> 2;
@@ -606,12 +639,14 @@ seaf_fs_manager_index_blocks (SeafFSManager *mgr,
         cdc.write_block = seafile_write_chunk;
         memcpy (cdc.repo_id, repo_id, 36);
         cdc.version = version;
+        // open the file, read and sha1 contents. store hashes into cdc.blk_sha1s
         if (filename_chunk_cdc (file_path, &cdc, crypt, write_data) < 0) {
             g_warning ("Failed to chunk file with CDC.\n");
             return -1;
         }
 
-        if (write_data && write_seafile (mgr, repo_id, version, &cdc, sha1) < 0) {
+        // create json with sha1 hashes of all blocks and write to cache filesystem in .seafile-data
+        if (write_data && write_seafile (mgr, repo_id, version, &cdc, sha1, SEAF_METADATA_TYPE_FILE) < 0) {
             g_warning ("Failed to write seafile for %s.\n", file_path);
             return -1;
         }
@@ -747,7 +782,7 @@ seaf_fs_manager_index_file_blocks (SeafFSManager *mgr,
             goto out;
         }
 
-        if (write_seafile (mgr, repo_id, version, &cdc, sha1) < 0) {
+        if (write_seafile (mgr, repo_id, version, &cdc, sha1, SEAF_METADATA_TYPE_FILE) < 0) {
             seaf_warning ("Failed to write seafile.\n");
             ret = -1;
             goto out;

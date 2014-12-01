@@ -210,7 +210,7 @@ unlink_entry (struct cache_entry *ce, struct unpack_trees_options *o)
 
     if (!S_ISDIR(ce->ce_mode)) {
         /* file doesn't exist in work tree */
-        if (seaf_stat (path, &st) < 0 || !S_ISREG(st.st_mode)) {
+        if (seaf_stat (path, &st) < 0 || (!S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) ) {
             return 0;
         }
 

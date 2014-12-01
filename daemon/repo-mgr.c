@@ -461,7 +461,11 @@ add_recursive (const char *repo_id,
         return -1;
     }
 
-    if (S_ISREG(st.st_mode)) {
+#ifdef SYMLINKS_NO_FOLLOW
+    if (S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)) {
+#else
+    //if (S_ISREG(st.st_mode)) {
+#endif
         gboolean added = FALSE;
         if (!remain_files) {
             ret = add_to_index (repo_id, version, istate, path, full_path,
@@ -579,7 +583,8 @@ remove_deleted (struct index_state *istate, const char *worktree,
              * In this case we don't want to mistakenly remove the file
              * from the repo.
              */
-            if ((ret < 0 || !S_ISREG (st.st_mode)) &&
+            int is_file = S_ISREG (st.st_mode) || S_ISLNK (st.st_mode);
+            if ((ret < 0 || !is_file) &&
                 (ce->ce_ctime.sec != 0 || ce_stage(ce) != 0))
                 ce_array[i]->ce_flags |= CE_REMOVE;
         }

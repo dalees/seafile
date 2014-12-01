@@ -42,7 +42,11 @@ typedef struct RepoWatchInfo {
     char *worktree;
 } RepoWatchInfo;
 
-#define WATCH_MASK IN_MODIFY | IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_CLOSE_WRITE | IN_ATTRIB
+#ifdef SYMLINKS_NO_FOLLOW
+#define WATCH_MASK IN_MODIFY | IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_CLOSE_WRITE | IN_ATTRIB | IN_DONT_FOLLOW
+#else
+//#define WATCH_MASK IN_MODIFY | IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_CLOSE_WRITE | IN_ATTRIB
+#endif // SYMLINKS_NO_FOLLOW
 
 struct SeafWTMonitorPriv {
     pthread_mutex_t hash_lock;
@@ -506,7 +510,12 @@ add_watch_recursive (RepoWatchInfo *info,
 
     full_path = g_build_filename (worktree, path, NULL);
 
-    if (stat (full_path, &st) < 0) {
+    // DALETODO: stat() WILL FOLLOW SYMLINKS. FIX THIS DEPENDING ON OPTION FLAGS
+#ifdef SYMLINKS_NO_FOLLOW
+    if (lstat (full_path, &st) < 0) {
+#else
+    //if (stat (full_path, &st) < 0) {
+#endif // SYMLINKS_NO_FOLLOW
         seaf_warning ("[wt mon] fail to stat %s: %s\n", full_path, strerror(errno));
         goto out;
     }

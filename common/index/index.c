@@ -454,7 +454,8 @@ void fill_stat_cache_info(struct cache_entry *ce, SeafStat *st)
     /* if (assume_unchanged) */
     /*     ce->ce_flags |= CE_VALID; */
 
-    if (S_ISREG(st->st_mode))
+    // DALETODO: is below marking of up-to-date correct for links, too?
+    if (S_ISREG(st->st_mode)|S_ISLNK(st->st_mode))
         ce_mark_uptodate(ce);
 }
 

@@ -228,6 +228,91 @@ int filename_chunk_cdc(const char *filename,
     return ret;
 }
 
+int symlink_chunk_cdc(const char *filename,
+                       CDCFileDescriptor *file_descr,
+                       struct SeafileCrypt *crypt,
+                       gboolean write_data)
+{
+    // Open the symlink, read contents into a buffer
+    // This is messy copypasta from file_chunk_cdc
+    char *buf;
+    uint32_t buf_sz;
+    SHA_CTX file_ctx;
+    CDCDescriptor chunk_descr;
+    SHA1_Init (&file_ctx);
+
+    SeafStat sb;
+    if (seaf_stat (filename, &sb) < 0) {
+        g_warning ("CDC: failed to stat: %s.\n", strerror(errno));
+        return -1;
+    }
+    uint64_t expected_size = sb.st_size;
+
+    init_cdc_file_descriptor (-1, expected_size, file_descr);
+    uint32_t block_min_sz = file_descr->block_min_sz;
+    uint32_t block_mask = file_descr->block_sz - 1;
+
+    int fingerprint = 0;
+    int offset = 0;
+    int ret = 0;
+    int tail, cur, rsize;
+
+    buf_sz = file_descr->block_max_sz;
+    buf = chunk_descr.block_buf = malloc (buf_sz);
+    if (!buf)
+        return -1;
+
+    /* buf: a fix-sized buffer.
+     * cur: data behind (inclusive) this offset has been scanned.
+     *      cur + 1 is the bytes that has been scanned.
+     * tail: length of data loaded into memory. buf[tail] is invalid.
+     */
+    tail = cur = 0;
+    while (1) {
+        /*if (tail < block_min_sz) {
+            rsize = block_min_sz - tail + READ_SIZE;
+        } else {
+            rsize = (buf_sz - tail < READ_SIZE) ? (buf_sz - tail) : READ_SIZE;
+        }*/
+        rsize = buf_sz;
+        //ret = readn (fd_src, buf + tail, rsize);
+        ret = readlink(filename, buf, rsize);
+        if (ret < 0) {
+            g_warning ("CDC: failed to read link: %s.\n", strerror(errno));
+            free (buf);
+            return -1;
+        }
+        tail += ret;
+        file_descr->file_size += ret;
+
+        if (file_descr->file_size != expected_size) {
+            g_warning ("File size changed while chunking or unable to read the entire link into buf.\n");
+            free (buf);
+            return -1;
+        }
+
+        // We've read all the data in this symlink. Output the block immediately.
+        //if (tail < block_min_sz || cur >= tail) {
+        //    if (tail > 0) {
+                if (file_descr->block_nr == file_descr->max_block_nr) {
+                    g_warning ("Block id array is not large enough, bail out.\n");
+                    free (buf);
+                    return -1;
+                }
+                WRITE_CDC_BLOCK (tail, write_data);
+        //    }
+            break;
+        //}
+
+    } 
+
+    SHA1_Final (file_descr->file_sum, &file_ctx);
+
+    free (buf);
+
+    return 0;
+}
+
 void cdc_init ()
 {
     rabin_init (BLOCK_WIN_SZ);

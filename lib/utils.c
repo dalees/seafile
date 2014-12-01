@@ -328,7 +328,31 @@ out:
 
     return ret;
 #else
-    return stat (path, st);
+    // DALETODO: REVERT THIS CHANGE TO SOMETHING NICER
+    return lstat (path, st);
+#endif
+}
+
+int
+seaf_lstat (const char *path, SeafStat *st)
+{
+#ifdef WIN32
+    wchar_t *wpath = g_utf8_to_utf16 (path, -1, NULL, NULL, NULL);
+    int ret = 0;
+
+    if (_wstat64 (wpath, st) < 0) {
+        ret = -1;
+        goto out;
+    }
+
+    if (get_utc_file_time (path, wpath, &st->st_mtime, &st->st_ctime) < 0)
+        ret = -1;
+out:
+    g_free (wpath);
+
+    return ret;
+#else
+    return lstat (path, st);
 #endif
 }
 
