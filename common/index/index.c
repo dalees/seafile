@@ -1426,18 +1426,6 @@ struct cache_entry *make_cache_entry(unsigned int mode,
 }
 
 
-#if 0
-int add_file_to_index(struct index_state *istate, const char *path, int flags)
-{
-    SeafStat st;
-    if (seaf_stat (path, &st)) {
-        g_warning("unable to stat '%s'\n", path);
-        return -1;
-    }
-    return add_to_index(istate, path, &st, flags);
-}
-#endif
-
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
 static const char *object_type_strings[] = {
@@ -1454,108 +1442,6 @@ static const char *typename(unsigned int type)
         return NULL;
     return object_type_strings[type];
 }
-
-#if 0
-static int type_from_string(const char *str)
-{
-    int i;
-
-    for (i = 1; i < ARRAY_SIZE(object_type_strings); i++)
-        if (!strcmp(str, object_type_strings[i]))
-            return i;
-    g_warning("invalid object type \"%s\"\n", str);
-    return -1;
-}
-#endif
-
-static void hash_sha1_file(const void *buf, unsigned long len,
-                           const char *type, unsigned char *sha1)
-{
-    SHA_CTX c;
-
-    /* Sha1.. */
-    SHA1_Init(&c);
-    SHA1_Update(&c, buf, len);
-    SHA1_Final(sha1, &c);
-}
-
-static int index_mem(unsigned char *sha1, void *buf, uint64_t size,
-                     enum object_type type, const char *path)
-{
-    if (!type)
-        type = OBJ_BLOB;
-
-    hash_sha1_file(buf, size, typename(type), sha1);
-    return 0;
-}
-
-#define SMALL_FILE_SIZE (32*1024)
-
-int index_fd(unsigned char *sha1, int fd, SeafStat *st,
-             enum object_type type, const char *path)
-{
-    int ret;
-    uint64_t size = st->st_size;
-
-    if (!size) {
-        ret = index_mem(sha1, NULL, size, type, path);
-    } else if (size <= SMALL_FILE_SIZE) {
-        char *buf = malloc(size);
-        if (size == readn(fd, buf, size)) {
-            ret = index_mem(sha1, buf, size, type, path);
-        } else {
-            g_warning("short read %s\n", strerror(errno));
-            ret = -1;
-        }
-        free(buf);
-    } else {
-        void *buf = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-        ret = index_mem(sha1, buf, size, type, path);
-        munmap(buf, size);
-    }
-    close(fd);
-    return ret;
-}
-
-int index_path(unsigned char *sha1, const char *path, SeafStat *st)
-{
-    int fd;
-    char buf[SEAF_PATH_MAX];
-    int pathlen;
-
-    switch (st->st_mode & S_IFMT) {
-    case S_IFREG:
-        fd = g_open (path, O_RDONLY | O_BINARY, 0);
-        if (fd < 0) {
-            g_warning("g_open (\"%s\"): %s\n", path, strerror(errno));
-            return -1;
-        }
-        if (index_fd(sha1, fd, st, OBJ_BLOB, path) < 0) {
-            return -1;
-        }
-        break;
-#ifndef WIN32        
-    case S_IFLNK:
-        pathlen = readlink(path, buf, SEAF_PATH_MAX);
-        if (pathlen != st->st_size) {
-            char *errstr = strerror(errno);
-            g_warning("readlink(\"%s\"): %s\n", path, errstr);
-            return -1;
-        }
-        hash_sha1_file(buf, pathlen, typename(OBJ_BLOB), sha1);
-        break;
-#endif        
-    default:
-        g_warning("%s: unsupported file type\n", path);
-        return -1;
-    }
-    return 0;
-}
-
-#if 0
-static unsigned char write_buffer[WRITE_BUFFER_SIZE];
-static unsigned long write_buffer_len;
-#endif
 
 #define WRITE_BUFFER_SIZE 8192
 
