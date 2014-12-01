@@ -166,7 +166,7 @@ send_fs_object (CcnetProcessor *processor,
         }
     }
 
-    seaf_debug ("Send fs object %.8s.\n", object_id);
+    seaf_debug ("Send fsv1 object %.8s.\n", object_id);
 
     free (pack);
 }

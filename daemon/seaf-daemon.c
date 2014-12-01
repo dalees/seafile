@@ -362,6 +362,8 @@ main (int argc, char **argv)
     char *ccnet_debug_level_str = "info";
     char *seafile_debug_level_str = "debug";
 
+    seaf_warning("Entered main.\n");
+
 #ifdef WIN32
     LoadLibraryA ("exchndl.dll");
 

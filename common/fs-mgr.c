@@ -330,6 +330,7 @@ create_seafile_v0 (CDCFileDescriptor *cdc, int *ondisk_size, char *seafile_id)
 {
     SeafileOndisk *ondisk;
 
+    g_warning("TODO: handle symlinks here\n");
     rawdata_to_hex (cdc->file_sum, seafile_id, 20);
 
     *ondisk_size = sizeof(SeafileOndisk) + cdc->block_nr * 20;
@@ -356,7 +357,8 @@ create_seafile_json (int repo_version,
     object = json_object ();
 
     
-    json_object_set_int_member (object, "type", mtype);
+    // DALETODO: Symlinks should use SeafMetadataType:SEAF_METADATA_TYPE_LINK
+    json_object_set_int_member (object, "type", mtype); // TODO: SUPPORT SYMLINKS
     json_object_set_int_member (object, "version",
                                 seafile_version_from_repo_version(repo_version));
 
@@ -376,6 +378,8 @@ create_seafile_json (int repo_version,
     char *data = json_dumps (object, JSON_SORT_KEYS);
     *ondisk_size = strlen(data);
 
+    seaf_debug("Json data: %s\n", data);
+
     /* The seafile object id is sha1 hash of the json object. */
     unsigned char sha1[20];
     calculate_sha1 (sha1, data, *ondisk_size);
@@ -394,6 +398,7 @@ seaf_fs_manager_calculate_seafile_id_json (int repo_version,
 
     object = json_object ();
 
+    g_warning("TODO: handle symlinks here\n");
     json_object_set_int_member (object, "type", SEAF_METADATA_TYPE_FILE);
     json_object_set_int_member (object, "version",
                                 seafile_version_from_repo_version(repo_version));
@@ -412,6 +417,7 @@ seaf_fs_manager_calculate_seafile_id_json (int repo_version,
     json_object_set_new (object, "block_ids", block_id_array);
 
     char *data = json_dumps (object, JSON_SORT_KEYS);
+    seaf_debug("calculate_seafile_id_json: %s\n", data);
     int ondisk_size = strlen(data);
 
     /* The seafile object id is sha1 hash of the json object. */
@@ -763,6 +769,8 @@ seaf_fs_manager_index_file_blocks (SeafFSManager *mgr,
 {
     int ret = 0;
     CDCFileDescriptor cdc;
+
+    seaf_debug("seaf_fs_manager_index_file_blocks");
 
     if (!paths) {
         /* handle empty file. */
@@ -1742,6 +1750,7 @@ fs_object_from_json (const char *obj_id, uint8_t *data, int len)
 
     type = json_object_get_int_member (object, "type");
 
+    g_warning("TODO: handle symlinks here\n");
     if (type == SEAF_METADATA_TYPE_FILE)
         fs_obj = (SeafFSObject *)seafile_from_json_object (obj_id, object);
     else if (type == SEAF_METADATA_TYPE_DIR)
@@ -1773,6 +1782,7 @@ seaf_fs_object_free (SeafFSObject *obj)
 {
     if (!obj)
         return;
+    g_warning("TODO: handle symlinks here\n");
 
     if (obj->type == SEAF_METADATA_TYPE_FILE)
         seafile_unref ((Seafile *)obj);
@@ -2423,6 +2433,7 @@ verify_seafile_v0 (const char *id, const void *data, int len, gboolean verify_id
     SHA_CTX ctx;
     uint8_t sha1[20];
     char check_id[41];
+    g_warning("TODO: handle symlinks here\n");
 
     if (len < sizeof(SeafileOndisk)) {
         seaf_warning ("[fs mgr] Corrupt seafile object %s.\n", id);
@@ -2501,6 +2512,7 @@ verify_fs_object_v0 (const char *obj_id,
 {
     gboolean ret = TRUE;
 
+    g_warning("TODO: handle symlinks here\n");
     int type = seaf_metadata_type_from_data (obj_id, data, len, FALSE);
     switch (type) {
     case SEAF_METADATA_TYPE_FILE:

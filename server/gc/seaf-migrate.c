@@ -215,6 +215,7 @@ fs_callback (SeafFSManager *mgr,
     if (data->stop_copy_blocks)
         return TRUE;
 
+    g_warning("TODO: handle symlinks here\n");
     if (type == SEAF_METADATA_TYPE_FILE &&
         migrate_file_blocks (mgr, data, obj_id) < 0)
         return FALSE;

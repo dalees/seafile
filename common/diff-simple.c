@@ -181,7 +181,7 @@ diff_files (int n, SeafDirent *dents[], const char *basedir, DiffOptions *opt)
 
     memset (files, 0, sizeof(files[0])*n);
     for (i = 0; i < n; ++i) {
-        if (dents[i] && S_ISREG(dents[i]->mode)) {
+        if (dents[i] && S_ISREG(dents[i]->mode)) { // TODODALE: isreg
             files[i] = dents[i];
             ++n_files;
         }

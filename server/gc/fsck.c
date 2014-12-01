@@ -76,6 +76,7 @@ fs_callback (SeafFSManager *mgr,
 {
     FsckRes *res = user_data;
 
+    g_warning("TODO: handle symlinks here\n");
     if (type == SEAF_METADATA_TYPE_FILE && check_blocks (mgr, res, obj_id) < 0)
         return FALSE;
 

@@ -168,6 +168,7 @@ fs_callback (SeafFSManager *mgr,
         g_hash_table_insert (data->visited, key, key);
     }
 
+    g_warning("TODO: handle symlinks here\n");
     if (type == SEAF_METADATA_TYPE_FILE &&
         migrate_blocks (mgr, repo_id, version, data, obj_id) < 0)
         return FALSE;

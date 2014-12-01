@@ -144,6 +144,8 @@ update_index (struct index_state *istate, const char *index_path)
     int index_fd;
     int ret = 0;
 
+    seaf_debug("update_index to file: %s\n", index_path);
+
     snprintf (index_shadow, SEAF_PATH_MAX, "%s.shadow", index_path);
     index_fd = g_open (index_shadow, O_RDWR | O_CREAT | O_TRUNC | O_BINARY, 0666);
     if (index_fd < 0) {
@@ -597,6 +599,7 @@ checkout_entry (struct cache_entry *ce,
         goto update_cache;
     }
 
+    // DALETODO: handle symlinks here
     if (!o->reset && seaf_stat (path, &st) == 0 && S_ISREG(st.st_mode) &&
         (ce->current_mtime != st.st_mtime))
     {

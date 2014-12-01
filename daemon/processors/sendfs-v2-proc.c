@@ -414,7 +414,7 @@ send_fs_object (CcnetProcessor *processor,
         }
     }
 
-    seaf_debug ("Send fs object %.8s.\n", object_id);
+    seaf_debug ("Send fsv2 object %.8s. Size %d\n", object_id, pack_size);
 
     free (pack);
 }
@@ -454,7 +454,7 @@ send_next_object (CcnetProcessor *processor)
     char *object_id;
 
     if (priv->recv_obj_list == NULL) {
-        seaf_debug ("Send fs objects end.\n");
+        seaf_debug ("Send fsv2 objects end.\n");
         return;
     }
 

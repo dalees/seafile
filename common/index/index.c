@@ -322,6 +322,7 @@ int read_index_from(struct index_state *istate, const char *path, int repo_versi
     istate->i_name_hash = g_hash_table_new_full (g_str_hash, g_str_equal,
                                                  g_free, NULL);
 #endif
+    g_warning("read_index_from: %s\n", path);
 
     /*
      * The disk format is actually larger than the in-memory format,
@@ -929,7 +930,7 @@ static int add_index_entry_with_check(struct index_state *istate, struct cache_e
     /* } */
     return pos + 1;
 }
-
+// once the file has been chunked and json hashes calculated, 
 int add_index_entry(struct index_state *istate, struct cache_entry *ce, int option)
 {
     int pos;
@@ -982,6 +983,8 @@ int add_to_index(const char *repo_id,
     int add_option = (ADD_CACHE_OK_TO_ADD|ADD_CACHE_OK_TO_REPLACE);
 
     *added = FALSE;
+
+    g_warning("Adding item to index: %s\n",path);
 
     if (!S_ISREG(st_mode) && !S_ISLNK(st_mode) && !S_ISDIR(st_mode)) {
         g_warning("%s: can only add regular files, symbolic links or git-directories\n", path);
@@ -1764,6 +1767,8 @@ int write_index(struct index_state *istate, int newfd)
     int entries = istate->cache_nr;
     SeafStat st;
 
+    g_warning("Writing index to file\n");
+
     memset (&info, 0, sizeof(info));
 
     for (i = removed = extended = 0; i < entries; i++) {
@@ -1832,6 +1837,7 @@ int discard_index(struct index_state *istate)
     istate->timestamp.sec = 0;
     istate->timestamp.nsec = 0;
     istate->name_hash_initialized = 0;
+    g_warning("discarded index\n");
     g_hash_table_destroy (istate->name_hash);
 #if defined WIN32 || defined __APPLE__
     g_hash_table_destroy (istate->i_name_hash);
@@ -1855,6 +1861,7 @@ void cache_entry_free (struct cache_entry *ce)
 void remove_name_hash(struct index_state *istate, struct cache_entry *ce)
 {
     g_hash_table_remove (istate->name_hash, ce->name);
+    g_warning("Removed %s from index\n", ce->name);
 
 #if defined WIN32 || defined __APPLE__
     char *i_name = g_utf8_strdown (ce->name, -1);
@@ -1866,8 +1873,9 @@ void remove_name_hash(struct index_state *istate, struct cache_entry *ce)
 void add_name_hash(struct index_state *istate, struct cache_entry *ce)
 {
     g_hash_table_insert (istate->name_hash, g_strdup(ce->name), ce);
+    g_warning("Added %s to index\n", ce->name);
 #if defined WIN32 || defined __APPLE__
-    g_hash_table_insert (istate->i_name_hash, g_utf8_strdown(ce->name, -1), ce);
+    g_hash_table_insert (istate->i_name_hash, g_utf8_strdown(ce->name, -1), ce); // case-insensitive name hash
 #endif
 }
 

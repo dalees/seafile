@@ -52,6 +52,7 @@ typedef struct _CDCFileDescriptor {
     uint8_t *blk_sha1s;
     int max_block_nr;
     uint8_t  file_sum[CHECKSUM_LENGTH];
+    //DALETODO: should we add file/symlink flag in here? filename and mode are not here.
 
     WriteblockFunc write_block;
 

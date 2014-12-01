@@ -1105,6 +1105,7 @@ update_sync_status (SyncTask *task)
     SeafRepo *repo = task->repo;
     SeafBranch *master, *local;
     char *last_uploaded = NULL, *last_checkout = NULL;
+    seaf_debug("update_sync_status: State:%d, InSync:%s\n", sync_state_str[task->state], info->in_sync?"True":"False");
 
     local = seaf_branch_manager_get_branch (
         seaf->branch_mgr, info->repo_id, "local");
@@ -1245,6 +1246,7 @@ update_sync_status_v2 (SyncTask *task)
     SyncInfo *info = task->info;
     SeafRepo *repo = task->repo;
     SeafBranch *master = NULL, *local = NULL;
+    seaf_debug("update_sync_status_v2: State:%d, InSync:%s\n", sync_state_str[task->state], info->in_sync?"True":"False");
 
     local = seaf_branch_manager_get_branch (
         seaf->branch_mgr, info->repo_id, "local");
@@ -1424,6 +1426,8 @@ commit_job (void *vtask)
     struct CommitResult *res = g_new0 (struct CommitResult, 1);
     GError *error = NULL;
 
+    seaf_debug("commit_job started\n");
+
     res->task = task;
 
     if (repo->delete_pending)
@@ -1512,6 +1516,7 @@ commit_repo (SyncTask *task)
     }
 
     task->mgr->commit_job_running = TRUE;
+    seaf_debug("commit_repo function running\n");
 
     transition_sync_state (task, SYNC_STATE_COMMIT);
 

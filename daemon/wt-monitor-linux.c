@@ -347,6 +347,32 @@ process_one_event (int in_fd,
          * we don't need to worry about missing this file.
          */
         char *fullpath = g_build_filename (worktree, filename, NULL);
+        seaf_debug ("\tFullpath: %s\n", fullpath);
+
+        // Get info on the inode itself
+        struct stat stln;
+        if ( lstat (fullpath, &stln) == 0 ) {
+            char *s_type = S_ISLNK(stln.st_mode)?"Symlink":S_ISSOCK(stln.st_mode)?"Socket":S_ISREG(stln.st_mode)?"Regular file":S_ISBLK(stln.st_mode)?"Block Device":S_ISDIR(stln.st_mode)?"Directory":"Unknown Mode";
+            seaf_debug ("\tStat reveals file is mode %s.\n", s_type);
+            if ( S_ISLNK(stln.st_mode) ) {
+                char *s_buf = malloc(stln.st_size);
+                int rl = readlink(fullpath, s_buf, stln.st_size);
+                s_buf[rl] = '\0';
+                seaf_debug ("\tStat reveals file is symlink to %s.\n", s_buf);
+                free(s_buf);
+
+                struct stat st2;
+                if ( stat(fullpath, &st2) == 0 )
+                {
+                    seaf_debug("\tThe file given by stat is inode %u, size %u.\n", st2.st_ino, st2.st_size);
+                }
+            }
+        }
+        // Decide if we should follow symlinks
+        //  Option 1: Never lstat
+        //  Option 2: Only if device id's are the same
+        //  Option 3: Always lstat and follow
+
         struct stat st;
         if (lstat (fullpath, &st) < 0 ||
             (!S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode))) {
@@ -363,6 +389,7 @@ process_one_event (int in_fd,
          * have to scan recursively and very few new files will be found.
          */
         add_event_to_queue (status, WT_EVENT_CREATE_OR_UPDATE, filename, NULL);
+        // DALETODO: check if symlink before adding watch?
         add_watch_recursive (info, in_fd, worktree, filename, FALSE);
     } else if (event->mask & IN_DELETE) {
         seaf_debug ("Deleted %s.\n", filename);

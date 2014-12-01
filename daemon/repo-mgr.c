@@ -124,7 +124,7 @@ seaf_repo_check_worktree (SeafRepo *repo)
                       repo->worktree, repo->name, repo->id);
         return -1;
     }
-    if (seaf_stat(repo->worktree, &st) < 0) {
+    if (seaf_stat(repo->worktree, &st) < 0) { // daletodo: allow symlink follow here
         seaf_warning ("Failed to stat worktree %s for repo '%s'(%.8s)\n",
                       repo->worktree, repo->name, repo->id);
         return -1;
@@ -448,10 +448,13 @@ add_recursive (const char *repo_id,
     int ret = 0;
 
     full_path = g_build_path (PATH_SEPERATOR, worktree, path, NULL);
+
+    seaf_debug("add_recursive: %s\n", full_path);
     if (seaf_stat (full_path, &st) < 0) {
 #ifndef WIN32
         /* Ignore broken symlinks on Linux and Mac OS X */
         if (lstat (full_path, &st) == 0 && S_ISLNK(st.st_mode)) {
+            seaf_debug("add_recursive: bailing on symlink\n");
             g_free (full_path);
             return 0;
         }
@@ -830,6 +833,7 @@ apply_worktree_changes_to_index (SeafRepo *repo, struct index_state *istate,
 
         switch (event->ev_type) {
         case WT_EVENT_CREATE_OR_UPDATE:
+            seaf_debug("Processing WT_EVENT_CREATE_OR_UPDATE event: %s\n", event->path);
             /* If consecutive CREATE_OR_UPDATE events present
                in the event queue, only process the last one.
             */
@@ -1777,7 +1781,7 @@ checkout_file (const char *repo_id,
 
     path_exists = (seaf_stat (path, &st) == 0);
 
-    if (path_exists && S_ISREG(st.st_mode)) {
+    if (path_exists && S_ISREG(st.st_mode)) { // DALETODO: something required here for symlinks
         if (st.st_mtime == ce->ce_mtime.sec) {
             /* Worktree and index are consistent. */
             if (memcmp (sha1, ce->sha1, 20) == 0) {
@@ -1850,7 +1854,7 @@ checkout_file (const char *repo_id,
     }
 
     /* The worktree file may have been changed when we're downloading the blocks. */
-    if (path_exists && S_ISREG(st.st_mode) && !force_conflict) {
+    if (path_exists && S_ISREG(st.st_mode) && !force_conflict) {// DALETODO: something required here for symlinks, they have mod-times.
         seaf_stat (path, &st2);
         if (st.st_mtime != st2.st_mtime) {
             seaf_message ("File %s is updated by user. "
@@ -1859,7 +1863,7 @@ checkout_file (const char *repo_id,
         }
     }
 
-    /* then checkout the file. */
+    /* then checkout the file. */ // DALETODO: something required here for symlinks
     gboolean conflicted = FALSE;
     if (seaf_fs_manager_checkout_file (seaf->fs_mgr,
                                        repo_id,
@@ -1969,7 +1973,7 @@ cache_entry_from_diff_entry (DiffEntry *de)
     ce->ce_size = de->size;
     ce->ce_mtime.sec = de->mtime;
 
-    if (S_ISREG(de->mode))
+    if (S_ISREG(de->mode)) //DALETODO: remove this check. create_ce_mode does everything, including symlinks fine.
         ce->ce_mode = create_ce_mode (de->mode);
     else
         ce->ce_mode = S_IFDIR;
@@ -3883,7 +3887,7 @@ GList *seaf_repo_load_ignore_files (const char *worktree)
                               IGNORE_FILE, NULL);
     if (g_access (full_path, F_OK) < 0)
         goto error;
-    if (seaf_stat (full_path, &st) < 0)
+    if (seaf_stat (full_path, &st) < 0) // DALETODO: allow following of symlinks here
         goto error;
     if (!S_ISREG(st.st_mode))
         goto error;
