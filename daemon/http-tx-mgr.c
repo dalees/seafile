@@ -20,6 +20,7 @@
 #define HTTP_FORBIDDEN 403
 #define HTTP_NOT_FOUND 404
 #define HTTP_NO_QUOTA 443
+#define HTTP_REPO_DELETED 444
 #define HTTP_INTERNAL_SERVER_ERROR 500
 
 #define RESET_BYTES_INTERVAL_MSEC 1000
@@ -649,7 +650,9 @@ check_protocol_version_thread (void *vdata)
     data->success = TRUE;
 
     if (status == HTTP_OK) {
-        if (parse_protocol_version (rsp_content, rsp_size, data) < 0)
+        if (rsp_size == 0)
+            data->not_supported = TRUE;
+        else if (parse_protocol_version (rsp_content, rsp_size, data) < 0)
             data->not_supported = TRUE;
     } else {
         seaf_warning ("Bad response code for GET %s: %d.\n", url, status);
@@ -788,7 +791,7 @@ check_head_commit_thread (void *vdata)
         if (parse_head_commit_info (rsp_content, rsp_size, data) < 0)
             goto out;
         data->success = TRUE;
-    } else if (status == HTTP_NOT_FOUND) {
+    } else if (status == HTTP_REPO_DELETED) {
         data->is_deleted = TRUE;
         data->success = TRUE;
     } else {
@@ -2159,6 +2162,9 @@ get_needed_fs_id_list (HttpTxTask *task, Connection *conn, GList **fs_id_list)
     seaf_debug ("Received fs object list size %lu from %s:%s.\n",
                 n, task->host, task->repo_id);
 
+    GHashTable *checked_objs = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                                      g_free, NULL);
+
     for (i = 0; i < n; ++i) {
         str = json_array_get (array, i);
         if (!str) {
@@ -2170,6 +2176,11 @@ get_needed_fs_id_list (HttpTxTask *task, Connection *conn, GList **fs_id_list)
         }
 
         obj_id = json_string_value(str);
+
+        if (g_hash_table_lookup (checked_objs, obj_id))
+            continue;
+        char *key = g_strdup(obj_id);
+        g_hash_table_replace (checked_objs, key, key);
 
         if (!seaf_obj_store_obj_exists (seaf->fs_mgr->obj_store,
                                         task->repo_id, task->repo_version,
@@ -2187,6 +2198,7 @@ get_needed_fs_id_list (HttpTxTask *task, Connection *conn, GList **fs_id_list)
     }
 
     json_decref (array);
+    g_hash_table_destroy (checked_objs);
 
 out:
     g_free (url);
@@ -2227,7 +2239,7 @@ get_fs_objects (HttpTxTask *task, Connection *conn, GList **fs_list)
 
         *fs_list = g_list_delete_link (*fs_list, *fs_list);
 
-        g_hash_table_insert (requested, obj_id, obj_id);
+        g_hash_table_replace (requested, obj_id, obj_id);
 
         if (++n_sent >= GET_FS_OBJECT_N)
             break;
@@ -2266,10 +2278,13 @@ get_fs_objects (HttpTxTask *task, Connection *conn, GList **fs_list)
     int n_recv = 0;
     char *p = rsp_content;
     ObjectHeader *hdr = (ObjectHeader *)p;
+    char recv_obj_id[41];
     int n = 0;
     int size;
     int rc;
     while (n < rsp_size) {
+        memcpy (recv_obj_id, hdr->obj_id, 40);
+        recv_obj_id[40] = 0;
         size = ntohl (hdr->obj_size);
         if (n + sizeof(ObjectHeader) + size > rsp_size) {
             seaf_warning ("Incomplete object package received for repo %.8s.\n",
@@ -2283,18 +2298,18 @@ get_fs_objects (HttpTxTask *task, Connection *conn, GList **fs_list)
 
         rc = seaf_obj_store_write_obj (seaf->fs_mgr->obj_store,
                                        task->repo_id, task->repo_version,
-                                       hdr->obj_id,
+                                       recv_obj_id,
                                        hdr->object,
                                        size, FALSE);
         if (rc < 0) {
             seaf_warning ("Failed to write fs object %s in repo %.8s.\n",
-                          hdr->obj_id, task->repo_id);
+                          recv_obj_id, task->repo_id);
             task->error = HTTP_TASK_ERR_WRITE_LOCAL_DATA;
             ret = -1;
             goto out;
         }
 
-        g_hash_table_remove (requested, hdr->obj_id);
+        g_hash_table_remove (requested, recv_obj_id);
 
         p += (sizeof(ObjectHeader) + size);
         n += (sizeof(ObjectHeader) + size);
