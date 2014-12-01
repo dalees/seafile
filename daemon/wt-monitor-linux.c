@@ -310,7 +310,7 @@ process_one_event (int in_fd,
     gboolean update_last_changed = TRUE;
     gboolean add_to_queue = TRUE;
 
-    /* An inotfy watch has been removed, we don't care about this for now. */
+    /* An inotify watch has been removed, we don't care about this for now. */
     if ((event->mask & IN_IGNORED) || (event->mask & IN_UNMOUNT))
         return;
 

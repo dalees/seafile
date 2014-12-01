@@ -3864,7 +3864,7 @@ seaf_repo_manager_update_repos_server_host (SeafRepoManager *mgr,
 }
 
 /*
- * Read ignored files from ignore.txt
+ * Read ignored files from seafile-ignore.txt
  */
 GList *seaf_repo_load_ignore_files (const char *worktree)
 {

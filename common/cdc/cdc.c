@@ -78,7 +78,8 @@ do {                                                         \
     ret = file_descr->write_block (file_descr->repo_id,      \
                                    file_descr->version,      \
                                    &chunk_descr,             \
-            crypt, chunk_descr.checksum,                     \
+                                   crypt,                    \
+                                   chunk_descr.checksum,     \
                                    (write_data));            \
     if (ret < 0) {                                           \
         free (buf);                                          \

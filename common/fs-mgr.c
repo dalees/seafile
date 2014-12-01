@@ -21,6 +21,7 @@
 #include "block-mgr.h"
 #include "utils.h"
 #include "seaf-utils.h"
+#define DEBUG_FLAG SEAFILE_DEBUG_WATCH
 #include "log.h"
 #include "../common/seafile-crypt.h"
 
@@ -555,7 +556,7 @@ seafile_write_chunk (const char *repo_id,
             ret = do_write_chunk (repo_id, version, checksum, encrypted_buf, enc_len);
         g_free (encrypted_buf);
     } else {
-        /* not a encrypted repo, go ahead */
+        /* not an encrypted repo, go ahead */
         SHA1_Init (&ctx);
         SHA1_Update (&ctx, chunk->block_buf, chunk->len);
         SHA1_Final (checksum, &ctx);
